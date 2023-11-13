@@ -44,7 +44,7 @@ app.layout = html.Div([
 def update_file_list(n_clicks, path):
     try:
         # List objects in the specified path
-        objects = s3.list_objects(Bucket=BUCKET_NAME, Prefix=path)['Contents']
+        objects = s3.list_objects(Bucket=s3_bucket_name, Prefix=path)['Contents']
         files = [obj['Key'] for obj in objects]
 
         # Create a bar chart with file names
