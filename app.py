@@ -29,7 +29,7 @@ app.layout = html.Div([
         id="loading",
         type="default",
         children=[
-            dcc.Graph(id='file-list'),
+            html.Div(id='file-list'),
         ],
     ),
 ])
@@ -37,7 +37,7 @@ app.layout = html.Div([
 
 # Callback to update file list based on input path
 @app.callback(
-    Output('file-list', 'figure'),
+    Output('file-list', 'children'),
     [Input('submit-button', 'n_clicks')],
     [dash.dependencies.State('path-input', 'value')]
 )
@@ -45,17 +45,16 @@ def update_file_list(n_clicks, path):
     try:
         # List objects in the specified path
         objects = s3.list_objects(Bucket=s3_bucket_name, Prefix=path)['Contents']
-        files = [obj['Key'] for obj in objects]
 
-        # Create a bar chart with file names
-        fig = {
-            'data': [{'x': files, 'type': 'bar', 'name': 'File List'}],
-            'layout': {'title': f'Files in {path}', 'xaxis': {'title': 'File Name'}, 'yaxis': {'title': 'Count'}}
-        }
+        # Create a list of file information as text
+        file_info = []
+        for obj in objects:
+            file_info.append(f"File: {obj['Key']}, Size: {obj['Size']} bytes")
+
     except NoCredentialsError:
         return "Credentials not available."
 
-    return fig
+    return [html.P(info) for info in file_info]
 
 
 if __name__ == '__main__':
