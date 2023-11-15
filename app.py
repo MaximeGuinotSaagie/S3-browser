@@ -30,6 +30,7 @@ def format_file_size(size):
 
 # Dash layout
 app.layout = html.Div([
+    dcc.Location(id='url', refresh=False),  # Add Location component
     html.H1("S3 Browser"),
     dcc.Loading(
         id="loading",
