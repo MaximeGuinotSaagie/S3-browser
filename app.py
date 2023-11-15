@@ -74,6 +74,9 @@ def update_file_list(pathname, n_clicks):
         file_info = []
         for obj in objects:
             file_path = obj['Key']
+            # Skip files for drill-down
+            if not file_path.endswith('/'):
+                continue
             # Display only files of the first folder level
             if path and '/' in file_path[len(path):]:
                 continue
