@@ -1,7 +1,7 @@
 import os
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import boto3
 from botocore.exceptions import NoCredentialsError
 from dash_bootstrap_components import themes
@@ -32,6 +32,7 @@ def format_file_size(size):
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),  # Add Location component
     html.H1("S3 Browser"),
+    html.Button('Drill Up', id='drill-up-button', n_clicks=0),
     dcc.Loading(
         id="loading",
         type="default",
@@ -44,16 +45,27 @@ app.layout = html.Div([
 
 # Callback to update file list based on input path
 @app.callback(
-    Output('file-list', 'children'),
-    [Input('url', 'pathname')]
+    [Output('file-list', 'children'),
+     Output('drill-up-button', 'style')],
+    [Input('url', 'pathname'),
+     Input('drill-up-button', 'n_clicks')],
+    prevent_initial_call=True
 )
-def update_file_list(pathname):
+def update_file_list(pathname, n_clicks):
     try:
         # Extract the folder path from the URL
         path = pathname.split("/path/")[-1] if "/path/" in pathname else ""
 
         # If the path is empty, set it to the root level
         path = path or ""
+
+        # Check if the button was clicked for drill-up
+        drill_up_style = {'display': 'none'}
+        if n_clicks > 0:
+            # Drill up by removing the last folder from the path
+            path_list = path.split('/')
+            if len(path_list) > 1:
+                path = '/'.join(path_list[:-1])
 
         # List objects in the specified path
         objects = s3.list_objects(Bucket=s3_bucket_name, Prefix=path)['Contents']
@@ -62,6 +74,9 @@ def update_file_list(pathname):
         file_info = []
         for obj in objects:
             file_path = obj['Key']
+            # Display only files of the first folder level
+            if path and '/' in file_path[len(path):]:
+                continue
             file_size = format_file_size(obj['Size'])
             # Check if the object is a folder or file
             icon = '📂' if file_path.endswith('/') else '📄'
@@ -70,10 +85,14 @@ def update_file_list(pathname):
                 dcc.Link(f"{file_path}, Size: {file_size}", href=f'/path/{file_path}')
             ], className='file-entry'))
 
-    except NoCredentialsError:
-        return "Credentials not available."
+        # Display the drill-up button only if the current path is not the root
+        if path:
+            drill_up_style = {'display': 'inline-block'}
 
-    return file_info
+    except NoCredentialsError:
+        return "Credentials not available.", {'display': 'none'}
+
+    return file_info, drill_up_style
 
 
 if __name__ == '__main__':
