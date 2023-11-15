@@ -4,9 +4,10 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import boto3
 from botocore.exceptions import NoCredentialsError
+from dash_bootstrap_components import themes
 
 # Initialize Dash app
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=[themes.BOOTSTRAP])
 
 # AWS S3 credentials
 s3_access_key = os.environ["AWS_ACCESS_KEY_ID"]
@@ -19,11 +20,17 @@ s3 = boto3.client("s3",
                   aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
                   aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
 
+# Function to format file sizes
+def format_file_size(size):
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024.0:
+            break
+        size /= 1024.0
+    return "{:.2f} {}".format(size, unit)
+
 # Dash layout
 app.layout = html.Div([
     html.H1("S3 Browser"),
-    dcc.Input(id='path-input', type='text', value='', placeholder='Enter folder path'),
-    html.Button('Submit', id='submit-button'),
     dcc.Loading(
         id="loading",
         type="default",
@@ -37,11 +44,13 @@ app.layout = html.Div([
 # Callback to update file list based on input path
 @app.callback(
     Output('file-list', 'children'),
-    [Input('submit-button', 'n_clicks')],
-    [dash.dependencies.State('path-input', 'value')]
+    [Input('url', 'pathname')]
 )
-def update_file_list(n_clicks, path):
+def update_file_list(pathname):
     try:
+        # Extract the folder path from the URL
+        path = pathname.split("/path/")[-1] if "/path/" in pathname else ""
+
         # List objects in the specified path
         objects = s3.list_objects(Bucket=s3_bucket_name, Prefix=path)['Contents']
 
@@ -49,10 +58,13 @@ def update_file_list(n_clicks, path):
         file_info = []
         for obj in objects:
             file_path = obj['Key']
-            file_size = obj['Size']
+            file_size = format_file_size(obj['Size'])
+            # Check if the object is a folder or file
+            icon = '📂' if file_path.endswith('/') else '📄'
             file_info.append(html.Div([
-                dcc.Link(f"File: {file_path}, Size: {file_size} bytes", href=f'/path/{file_path}')
-            ]))
+                html.Span(icon, style={'marginRight': '5px'}),
+                dcc.Link(f"{file_path}, Size: {file_size}", href=f'/path/{file_path}')
+            ], className='file-entry'))
 
     except NoCredentialsError:
         return "Credentials not available."
@@ -60,22 +72,5 @@ def update_file_list(n_clicks, path):
     return file_info
 
 
-# Callback to handle drill-through links
-@app.callback(
-    Output('path-input', 'value'),
-    [Input('file-list', 'children')],
-    prevent_initial_call=True
-)
-def update_path_on_link_click(children):
-    # Get the path from the clicked link
-    clicked_link = [child for child in children if isinstance(child, html.Div) and 'dcc-link' in child.props['children'][0].props['className']]
-
-    if clicked_link:
-        path = clicked_link[0].props['children'][0].props['children'].split(": ")[1].split(",")[0]
-        return path
-    else:
-        raise dash.exceptions.PreventUpdate
-
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True)
+    app.run_server(host='0.0.0.0', port=8050, debug=True)
