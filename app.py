@@ -52,6 +52,9 @@ def update_file_list(pathname):
         # Extract the folder path from the URL
         path = pathname.split("/path/")[-1] if "/path/" in pathname else ""
 
+        # If the path is empty, set it to the root level
+        path = path or ""
+
         # List objects in the specified path
         objects = s3.list_objects(Bucket=s3_bucket_name, Prefix=path)['Contents']
 
