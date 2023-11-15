@@ -1,7 +1,7 @@
 import os
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output
 import boto3
 from botocore.exceptions import NoCredentialsError
 from dash_bootstrap_components import themes
@@ -32,7 +32,6 @@ def format_file_size(size):
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),  # Add Location component
     html.H1("S3 Browser"),
-    html.Button('Drill Up', id='drill-up-button', n_clicks=0),
     dcc.Loading(
         id="loading",
         type="default",
@@ -45,13 +44,11 @@ app.layout = html.Div([
 
 # Callback to update file list based on input path
 @app.callback(
-    [Output('file-list', 'children'),
-     Output('drill-up-button', 'style')],
-    [Input('url', 'pathname'),
-     Input('drill-up-button', 'n_clicks')],
+    Output('file-list', 'children'),
+    [Input('url', 'pathname')],
     prevent_initial_call=True
 )
-def update_file_list(pathname, n_clicks):
+def update_file_list(pathname):
     try:
         # Extract the folder path from the URL
         path = pathname.split("/path/")[-1] if "/path/" in pathname else ""
@@ -59,21 +56,10 @@ def update_file_list(pathname, n_clicks):
         # If the path is empty, set it to the root level
         path = path or ""
 
-        # Check if the button was clicked for drill-up
-        drill_up_style = {'display': 'none'}
-        if n_clicks > 0:
-            # Drill up by removing the last folder from the path
-            path_list = path.split('/')
-            if len(path_list) > 1:
-                path = '/'.join(path_list[:-1])
-            else:
-                # If already at root, set path to empty to display root files
-                path = ""
-
         # List objects in the specified path
         objects = s3.list_objects(Bucket=s3_bucket_name, Prefix=path)['Contents']
 
-        # Create a list of file information as text and clickable links
+        # Create a list of file information as text and boxes around the files
         file_info = []
         for obj in objects:
             file_path = obj['Key']
@@ -84,18 +70,14 @@ def update_file_list(pathname, n_clicks):
             # Check if the object is a folder or file
             icon = '📂' if file_path.endswith('/') else '📄'
             file_info.append(html.Div([
-                html.Span(icon, style={'marginRight': '5px'}),
-                dcc.Link(f"{file_path}, Size: {file_size}", href=f'/path/{file_path}')
+                html.Div(icon, style={'marginRight': '5px', 'display': 'inline-block'}),
+                html.Div(f"{file_path}, Size: {file_size}", className='file-box')
             ], className='file-entry'))
 
-        # Display the drill-up button only if the current path is not the root
-        if path:
-            drill_up_style = {'display': 'inline-block'}
-
     except NoCredentialsError:
-        return "Credentials not available.", {'display': 'none'}
+        return "Credentials not available."
 
-    return file_info, drill_up_style
+    return file_info
 
 
 if __name__ == '__main__':

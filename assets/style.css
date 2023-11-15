@@ -1,0 +1,10 @@
+/* assets/style.css */
+.file-box {
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+a {
+    text-decoration: none;
+}
