@@ -66,6 +66,9 @@ def update_file_list(pathname, n_clicks):
             path_list = path.split('/')
             if len(path_list) > 1:
                 path = '/'.join(path_list[:-1])
+            else:
+                # If already at root, set path to empty to display root files
+                path = ""
 
         # List objects in the specified path
         objects = s3.list_objects(Bucket=s3_bucket_name, Prefix=path)['Contents']
@@ -74,9 +77,6 @@ def update_file_list(pathname, n_clicks):
         file_info = []
         for obj in objects:
             file_path = obj['Key']
-            # Skip files for drill-down
-            if not file_path.endswith('/'):
-                continue
             # Display only files of the first folder level
             if path and '/' in file_path[len(path):]:
                 continue
