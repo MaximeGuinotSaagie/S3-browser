@@ -93,7 +93,7 @@ def update_file_list(selected_bucket, contents):
             file_info.append(html.Div([
                 html.Div(icon, style={'marginRight': '5px', 'display': 'inline-block', 'vertical-align': 'middle'}),
                 html.Div(f"{file_path}, Size: {file_size}", className='file-box', style={'display': 'inline-block', 'vertical-align': 'middle'}),
-                html.A("Download", href=f"/download/{selected_bucket}/{file_path}", className="download-link")
+                html.A("Download", href=f"/download/{selected_bucket}/{file_path}", className="download-link", download=file_path)
             ], className='file-entry'))
 
         # Handle file upload
@@ -114,7 +114,11 @@ def download_file(bucket, file_path):
     try:
         # Download file
         file_content = s3.get_object(Bucket=bucket, Key=file_path)['Body'].read()
-        return dcc.send_data_frame(file_content, filename=file_path)
+        return dcc.send_file({
+            'content': file_content,
+            'filename': file_path,
+            'mimetype': 'application/octet-stream'
+        })
 
     except NoCredentialsError:
         return "Credentials not available."
