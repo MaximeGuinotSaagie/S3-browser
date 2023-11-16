@@ -1,7 +1,7 @@
 import os
 import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash import dcc, html, Input as DashInput, Output as DashOutput
+from dash.dependencies import Input, Output, State
 import boto3
 from botocore.exceptions import NoCredentialsError
 from dash_bootstrap_components import themes
@@ -34,6 +34,11 @@ app.layout = html.Div([
         type="default",
         children=[
             html.Div(id='file-list'),
+            dcc.Upload(
+                id='upload-data',
+                children=html.Button('Upload File'),
+                multiple=False
+            ),
         ],
     ),
 ])
@@ -75,18 +80,55 @@ def update_file_list(selected_bucket):
         file_info = []
         for obj in objects:
             file_path = obj['Key']
+            # Exclude entries with 0 bytes (folders)
+            if obj['Size'] == 0:
+                continue
+
             file_size = format_file_size(obj['Size'])
             # Check if the object is a folder or file
             icon = '📂' if file_path.endswith('/') else '📄'
             file_info.append(html.Div([
                 html.Div(icon, style={'marginRight': '5px', 'display': 'inline-block', 'vertical-align': 'middle'}),
-                html.Div(f"{file_path}, Size: {file_size}", className='file-box', style={'display': 'inline-block', 'vertical-align': 'middle'})
+                html.Div(f"{file_path}, Size: {file_size}", className='file-box', style={'display': 'inline-block', 'vertical-align': 'middle'}),
+                html.A("Download", href=f"/download/{selected_bucket}/{file_path}", className="download-link")
             ], className='file-entry'))
 
     except NoCredentialsError:
         return []
 
     return file_info
+
+# Callback to handle file download
+@app.server.route("/download/<bucket>/<file_path>")
+def download_file(bucket, file_path):
+    try:
+        # Download file
+        file_content = s3.get_object(Bucket=bucket, Key=file_path)['Body'].read()
+        return dcc.send_data_frame(file_content, filename=file_path)
+
+    except NoCredentialsError:
+        return "Credentials not available."
+
+# Callback to handle file upload
+@app.callback(
+    Output('file-list', 'children'),
+    [Input('upload-data', 'contents')],
+    [State('bucket-dropdown', 'value')],
+    prevent_initial_call=True
+)
+def upload_file(contents, selected_bucket):
+    try:
+        if contents is not None:
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            file_path = "uploaded_file.txt"  # Set a default file name for now, you can extract from contents if needed
+            s3.upload_fileobj(io.BytesIO(decoded), selected_bucket, file_path)
+
+        # Refresh file list
+        return update_file_list(selected_bucket)
+
+    except NoCredentialsError:
+        return []
 
 # Function to format file sizes
 def format_file_size(size):
