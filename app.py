@@ -43,10 +43,11 @@ app.layout = html.Div([
 
 @app.callback(
     Output('bucket-dropdown', 'options'),
-    [Input('bucket-dropdown', 'search_value')],
+    [Input('bucket-dropdown', 'search_value'),
+     Input('page-load-trigger', 'n_clicks')],
     prevent_initial_call=True
 )
-def update_bucket_options(search_value):
+def update_bucket_options(search_value, n_clicks):
     try:
         buckets = s3.list_buckets()['Buckets']
         options = [{'label': bucket['Name'], 'value': bucket['Name']} for bucket in buckets]
