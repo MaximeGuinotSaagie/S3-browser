@@ -45,25 +45,6 @@ app.layout = html.Div([
     ),
 ])
 
-# Callback to update bucket dropdown options
-@app.callback(
-    Output('bucket-dropdown', 'options'),
-    [Input('bucket-dropdown', 'search_value')],
-    prevent_initial_call=True
-)
-def update_bucket_options(search_value):
-    try:
-        # List all available buckets
-        buckets = s3.list_buckets()['Buckets']
-
-        # Create options for the dropdown
-        options = [{'label': bucket['Name'], 'value': bucket['Name']} for bucket in buckets]
-
-    except NoCredentialsError:
-        return []
-
-    return options
-
 # Callback to update file list based on selected bucket and handle file upload
 @app.callback(
     Output('file-list', 'children'),
@@ -100,7 +81,10 @@ def update_file_list(selected_bucket, contents):
         if contents is not None:
             content_type, content_string = contents.split(',')
             decoded = base64.b64decode(content_string)
-            file_path = "uploaded_file.txt"  # Set a default file name for now, you can extract from contents if needed
+            # Extract the original filename from the content
+            original_filename = dash.callback_context.inputs[1]['filename']
+            # Use the original filename when saving to S3
+            file_path = original_filename
             s3.upload_fileobj(io.BytesIO(decoded), selected_bucket, file_path)
 
     except NoCredentialsError:
