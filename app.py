@@ -39,6 +39,8 @@ app.layout = html.Div([
             ),
         ],
     ),
+    # Add the page-load-trigger button and hide it with style
+    html.Button(id='page-load-trigger', style={'display': 'none'})
 ])
 
 @app.callback(
@@ -55,13 +57,7 @@ def update_bucket_options(search_value, n_clicks):
         return []
 
     return options
-
-@app.callback(
-    Output('file-list', 'children'),
-    [Input('bucket-dropdown', 'value'),
-     Input('upload-data', 'contents')],
-    prevent_initial_call=True
-)
+    
 def update_file_list(selected_bucket, contents):
     try:
         if not selected_bucket:
