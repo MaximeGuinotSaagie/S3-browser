@@ -114,11 +114,13 @@ def download_file(bucket, file_path):
     try:
         # Download file
         file_content = s3.get_object(Bucket=bucket, Key=file_path)['Body'].read()
-        return dcc.send_file({
+        response = dash.send_file({
             'content': file_content,
             'filename': file_path,
             'mimetype': 'application/octet-stream'
         })
+
+        return response
 
     except NoCredentialsError:
         return "Credentials not available."
