@@ -41,7 +41,6 @@ app.layout = html.Div([
     ),
 ])
 
-
 # Callback to update file list based on input path
 @app.callback(
     Output('file-list', 'children'),
@@ -78,7 +77,6 @@ def update_file_list(pathname):
         return "Credentials not available."
 
     return file_info
-
 
 if __name__ == '__main__':
     app.run_server(host='0.0.0.0', port=8050, debug=True)
