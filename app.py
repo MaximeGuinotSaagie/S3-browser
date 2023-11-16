@@ -4,6 +4,8 @@ from dash import dcc, html, Input as DashInput, Output as DashOutput
 from dash.dependencies import Input, Output, State
 import boto3
 from botocore.exceptions import NoCredentialsError
+import base64
+import io
 from dash_bootstrap_components import themes
 
 # Initialize Dash app
@@ -62,13 +64,14 @@ def update_bucket_options(search_value):
 
     return options
 
-# Callback to update file list based on selected bucket
+# Callback to update file list based on selected bucket and handle file upload
 @app.callback(
     Output('file-list', 'children'),
-    [Input('bucket-dropdown', 'value')],
+    [Input('bucket-dropdown', 'value'),
+     Input('upload-data', 'contents')],
     prevent_initial_call=True
 )
-def update_file_list(selected_bucket):
+def update_file_list(selected_bucket, contents):
     try:
         if not selected_bucket:
             return []
@@ -93,6 +96,13 @@ def update_file_list(selected_bucket):
                 html.A("Download", href=f"/download/{selected_bucket}/{file_path}", className="download-link")
             ], className='file-entry'))
 
+        # Handle file upload
+        if contents is not None:
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            file_path = "uploaded_file.txt"  # Set a default file name for now, you can extract from contents if needed
+            s3.upload_fileobj(io.BytesIO(decoded), selected_bucket, file_path)
+
     except NoCredentialsError:
         return []
 
@@ -108,27 +118,6 @@ def download_file(bucket, file_path):
 
     except NoCredentialsError:
         return "Credentials not available."
-
-# Callback to handle file upload
-@app.callback(
-    Output('file-list', 'children'),
-    [Input('upload-data', 'contents')],
-    [State('bucket-dropdown', 'value')],
-    prevent_initial_call=True
-)
-def upload_file(contents, selected_bucket):
-    try:
-        if contents is not None:
-            content_type, content_string = contents.split(',')
-            decoded = base64.b64decode(content_string)
-            file_path = "uploaded_file.txt"  # Set a default file name for now, you can extract from contents if needed
-            s3.upload_fileobj(io.BytesIO(decoded), selected_bucket, file_path)
-
-        # Refresh file list
-        return update_file_list(selected_bucket)
-
-    except NoCredentialsError:
-        return []
 
 # Function to format file sizes
 def format_file_size(size):
