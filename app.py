@@ -8,20 +8,16 @@ import base64
 import io
 from dash_bootstrap_components import themes
 
-# Initialize Dash app
 app = dash.Dash(__name__, external_stylesheets=[themes.BOOTSTRAP])
 
-# AWS S3 credentials
-s3_access_key = os.environ["AWS_ACCESS_KEY_ID"]
-s3_secret_key = os.environ["AWS_SECRET_ACCESS_KEY"]
+s3 = boto3.client(
+    "s3",
+    endpoint_url=os.environ["AWS_S3_ENDPOINT"],
+    region_name=os.environ["AWS_REGION_NAME"],
+    aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+    aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"]
+)
 
-s3 = boto3.client("s3",
-                  endpoint_url=os.environ["AWS_S3_ENDPOINT"],
-                  region_name=os.environ["AWS_REGION_NAME"],
-                  aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
-                  aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
-
-# Dash layout
 app.layout = html.Div([
     html.H1("S3 Browser"),
     dcc.Dropdown(
@@ -45,7 +41,20 @@ app.layout = html.Div([
     ),
 ])
 
-# Callback to update file list based on selected bucket and handle file upload
+@app.callback(
+    Output('bucket-dropdown', 'options'),
+    [Input('bucket-dropdown', 'search_value')],
+    prevent_initial_call=True
+)
+def update_bucket_options(search_value):
+    try:
+        buckets = s3.list_buckets()['Buckets']
+        options = [{'label': bucket['Name'], 'value': bucket['Name']} for bucket in buckets]
+    except NoCredentialsError:
+        return []
+
+    return options
+
 @app.callback(
     Output('file-list', 'children'),
     [Input('bucket-dropdown', 'value'),
@@ -57,33 +66,27 @@ def update_file_list(selected_bucket, contents):
         if not selected_bucket:
             return []
 
-        # List objects in the specified bucket
         objects = s3.list_objects(Bucket=selected_bucket)['Contents']
-
-        # Create a list of file information as text and boxes around the files
         file_info = []
+
         for obj in objects:
-            file_path = obj['Key']
-            # Exclude entries with 0 bytes (folders)
             if obj['Size'] == 0:
                 continue
 
+            file_path = obj['Key']
             file_size = format_file_size(obj['Size'])
-            # Check if the object is a folder or file
             icon = '📂' if file_path.endswith('/') else '📄'
+
             file_info.append(html.Div([
                 html.Div(icon, style={'marginRight': '5px', 'display': 'inline-block', 'vertical-align': 'middle'}),
                 html.Div(f"{file_path}, Size: {file_size}", className='file-box', style={'display': 'inline-block', 'vertical-align': 'middle'}),
                 html.A("Download", href=f"/download/{selected_bucket}/{file_path}", className="download-link", download=file_path)
             ], className='file-entry'))
 
-        # Handle file upload
         if contents is not None:
             content_type, content_string = contents.split(',')
             decoded = base64.b64decode(content_string)
-            # Extract the original filename from the content
             original_filename = dash.callback_context.inputs[1]['filename']
-            # Use the original filename when saving to S3
             file_path = original_filename
             s3.upload_fileobj(io.BytesIO(decoded), selected_bucket, file_path)
 
@@ -92,11 +95,9 @@ def update_file_list(selected_bucket, contents):
 
     return file_info
 
-# Callback to handle file download
 @app.server.route("/download/<bucket>/<file_path>")
 def download_file(bucket, file_path):
     try:
-        # Download file
         file_content = s3.get_object(Bucket=bucket, Key=file_path)['Body'].read()
         response = dash.send_file({
             'content': file_content,
@@ -109,7 +110,6 @@ def download_file(bucket, file_path):
     except NoCredentialsError:
         return "Credentials not available."
 
-# Function to format file sizes
 def format_file_size(size):
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size < 1024.0:
