@@ -39,17 +39,14 @@ app.layout = html.Div([
             ),
         ],
     ),
-    # Add the page-load-trigger button and hide it with style
-    html.Button(id='page-load-trigger', style={'display': 'none'})
 ])
 
 @app.callback(
     Output('bucket-dropdown', 'options'),
-    [Input('bucket-dropdown', 'search_value'),
-     Input('page-load-trigger', 'n_clicks')],
+    [Input('bucket-dropdown', 'search_value')],
     prevent_initial_call=True
 )
-def update_bucket_options(search_value, n_clicks):
+def update_bucket_options(search_value):
     try:
         buckets = s3.list_buckets()['Buckets']
         options = [{'label': bucket['Name'], 'value': bucket['Name']} for bucket in buckets]
@@ -57,7 +54,13 @@ def update_bucket_options(search_value, n_clicks):
         return []
 
     return options
-    
+
+@app.callback(
+    Output('file-list', 'children'),
+    [Input('bucket-dropdown', 'value'),
+     Input('upload-data', 'contents')],
+    prevent_initial_call=True
+)
 def update_file_list(selected_bucket, contents):
     try:
         if not selected_bucket:
